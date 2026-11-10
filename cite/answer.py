@@ -11,6 +11,7 @@ in der Praxis zählt: nicht die Antwort, sondern ob man ihr trauen kann.
 
 from __future__ import annotations
 
+import difflib
 import os
 import re
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ from cite.search import Hit
 
 DEFAULT_MODEL = os.environ.get("CITE_MODEL", "claude-haiku-5-5")
 PROMPT_VERSION = "p1"
+FUZZY_THRESHOLD = 0.85  # Anteil des Zitats, der im Stück wiedergefunden werden muss
 
 
 class Citation(BaseModel):
@@ -29,7 +31,8 @@ class Citation(BaseModel):
 
 
 class Answer(BaseModel):
-    answerable: bool = Field(description="false if the passages do not contain the information needed")
+    # Standard True: Haiku lässt das Feld gelegentlich weg, wenn es antworten kann; fehlende Belege sagen den Rest.
+    answerable: bool = Field(default=True, description="false if the passages do not contain the information needed")
     answer: str = Field(description="The answer in two to five plain sentences; if not answerable, say what is missing")
     citations: list[Citation] = Field(default_factory=list, description="One citation per claim; empty if not answerable")
 
@@ -62,8 +65,10 @@ class CheckedCitation:
     passage: int
     quote: str
     valid_passage: bool  # Nummer existiert
-    quote_found: bool    # Zitat steht wörtlich im Stück (nach Normalisierung von Leerraum)
+    quote_found: bool    # Zitat steht im Stück (Leerraum und Satzzeichen ignoriert, kleine Abweichungen erlaubt)
     ref: str = ""
+    fuzzy: bool = False  # nur über die Ähnlichkeitsschwelle gefunden, nicht Zeichen für Zeichen
+    similarity: float = 1.0
 
     @property
     def ok(self) -> bool:
@@ -85,24 +90,38 @@ class AnswerRecord:
         return self.answer.answerable and bool(self.checked) and all(c.ok for c in self.checked)
 
 
-def _squash(text: str) -> str:
-    """Leerraum und Zeilenumbrüche egalisieren, Anführungszeichen vereinheitlichen, damit ein Zitat über
-    einen Zeilenumbruch im PDF-Text hinweg trotzdem gefunden wird."""
-    text = text.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
-    return re.sub(r"\s+", " ", text).strip().lower()
+def _key(text: str) -> str:
+    """Vergleichsform: Kleinbuchstaben, nur Buchstaben und Ziffern. Damit stören weder Zeilenumbrüche noch
+    die Leerzeichen, die pypdf mitten in Wörter setzt ("c oordinating", "mark eting"), noch Anführungszeichen."""
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def locate_quote(quote: str, text: str) -> tuple[bool, float]:
+    """(gefunden?, Ähnlichkeit). Erst exakt auf der Vergleichsform. Sonst: welcher Anteil des Zitats kommt in
+    gleicher Reihenfolge im Stück vor (difflib, Blöcke ab 4 Zeichen)? Ein ausgetauschtes Wort in einem Satz
+    kostet etwa zehn Prozent, ein erfundenes Zitat liegt weit darunter."""
+    q, t = _key(quote), _key(text)
+    if not q:
+        return False, 0.0
+    if q in t:
+        return True, 1.0
+    blocks = difflib.SequenceMatcher(None, q, t, autojunk=False).get_matching_blocks()
+    covered = sum(b.size for b in blocks if b.size >= 4)
+    coverage = covered / len(q)
+    return coverage >= FUZZY_THRESHOLD, round(coverage, 3)
 
 
 def check_citations(answer: Answer, hits: list[Hit]) -> list[CheckedCitation]:
     out = []
     for c in answer.citations:
         valid = 1 <= c.passage <= len(hits)
-        found = False
-        ref = ""
+        found, sim, ref = False, 0.0, ""
         if valid:
             chunk = hits[c.passage - 1].chunk
             ref = chunk.ref
-            found = _squash(c.quote) in _squash(chunk.text)
-        out.append(CheckedCitation(passage=c.passage, quote=c.quote, valid_passage=valid, quote_found=found, ref=ref))
+            found, sim = locate_quote(c.quote, chunk.text)
+        out.append(CheckedCitation(passage=c.passage, quote=c.quote, valid_passage=valid, quote_found=found,
+                                   ref=ref, fuzzy=found and sim < 1.0, similarity=sim))
     return out
 
 
@@ -147,10 +166,15 @@ def format_record(rec: AnswerRecord) -> str:
     if not rec.answer.answerable:
         lines.append("(not answerable from the documents)")
     for c in rec.checked:
-        mark = "ok " if c.ok else ("?? " if c.valid_passage else "!! ")
+        mark = ("ok~" if c.fuzzy else "ok ") if c.ok else ("?? " if c.valid_passage else "!! ")
         where = c.ref if c.valid_passage else f"passage {c.passage} does not exist"
         lines.append(f"{mark}[{c.passage}] {where}")
-        lines.append(f"    \"{c.quote}\"" + ("" if c.quote_found or not c.valid_passage else "   <- quote not found verbatim"))
+        note = ""
+        if c.valid_passage and not c.quote_found:
+            note = f"   <- quote not found (best match {c.similarity:.2f})"
+        elif c.fuzzy:
+            note = f"   (near-verbatim, {c.similarity:.2f})"
+        lines.append(f"    \"{c.quote}\"{note}")
     lines.append("")
     lines.append(f"grounded: {'yes' if rec.grounded else 'no'}   model: {rec.model}   passages: {len(rec.hits)}")
     return "\n".join(lines)

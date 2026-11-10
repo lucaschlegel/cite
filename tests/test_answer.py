@@ -66,7 +66,7 @@ def test_fabricated_quote_and_bad_passage_are_flagged():
     assert rec.checked[0].valid_passage and not rec.checked[0].quote_found
     assert not rec.checked[1].valid_passage
     out = format_record(rec)
-    assert "quote not found verbatim" in out and "passage 7 does not exist" in out
+    assert "quote not found" in out and "passage 7 does not exist" in out
 
 
 def test_not_answerable_is_not_grounded():
@@ -78,3 +78,21 @@ def test_not_answerable_is_not_grounded():
 def test_check_citations_normalises_quotes_and_whitespace():
     answer = Answer(answerable=True, answer="x", citations=[{"passage": 2, "quote": "ALWAYS   be large enough"}])
     assert check_citations(answer, hits())[0].ok
+
+
+def test_pdf_artifacts_and_small_deviations_are_tolerated():
+    from cite.answer import locate_quote
+
+    text = "Where signatures of the principal or c oordinating investigators are required by\nregulatory authorities, these should be included in appendix 16.1.5"
+    found, sim = locate_quote("principal or coordinating investigators are required by regulatory authorities", text)
+    assert found and sim == 1.0  # Leerzeichen im Wort stört nicht
+    found, sim = locate_quote("principal or coordinating investigators are needed by regulatory authorities", text)
+    assert found and 0.85 <= sim < 1.0  # ein Wort anders: noch akzeptiert, aber als fuzzy markiert
+    found, sim = locate_quote("the sponsor must sign the report within thirty days", text)
+    assert not found and sim < 0.85
+
+
+def test_missing_answerable_defaults_to_true():
+    payload = {"answer": "Only one.", "citations": [{"passage": 1, "quote": "only one primary variable"}]}
+    rec = Answerer(FakeSearcher(), model="test", client=FakeClient(payload)).ask("q")
+    assert rec.answer.answerable and rec.grounded
