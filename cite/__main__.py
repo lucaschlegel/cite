@@ -3,6 +3,8 @@
   python -m cite ingest [--max-chars N]     Schritt 1: PDFs laden, schneiden, in SQLite ablegen
   python -m cite stats                      Was liegt in der Datenbank?
   python -m cite show <chunk-id>            Ein Stück ansehen
+  python -m cite index [--config c1200]     Schritt 2: Vektoren für alle Stücke rechnen (einmalig, lokal)
+  python -m cite search "frage" [--method]  Schritt 2: bm25 | embed | hybrid
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import sys
 from pathlib import Path
 
 from cite.ingest import ingest_document, load_sources
+from cite.search import DEFAULT_MODEL, Embedder, EmbeddingIndex, Searcher
 from cite.store import DB_FILE, connect, replace_chunks, stats, upsert_document
 
 
@@ -63,6 +66,35 @@ def cmd_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_index(args: argparse.Namespace) -> int:
+    con = connect(Path(args.db))
+    embedder = Embedder(args.model)
+    index = EmbeddingIndex.build(con, args.config, embedder, model_name=args.model,
+                                 log=lambda m: print(m, file=sys.stderr))
+    print(f"[ok] {len(index.chunks)} vectors ready ({args.config}, {args.model})", file=sys.stderr)
+    return 0
+
+
+def cmd_search(args: argparse.Namespace) -> int:
+    con = connect(Path(args.db))
+    searcher = Searcher(con, args.config, model_name=args.model)
+    hits = searcher.search(args.query, method=args.method, k=args.k)
+    try:
+        from rich.console import Console
+        from rich.table import Table
+    except ImportError:
+        for h in hits:
+            print(f"{h.rank:2} {h.score:7.3f} {h.chunk.ref} {h.snippet}")
+        return 0
+    table = Table(title=f"{args.method}: {args.query}")
+    for col in ("#", "Score", "Beleg", "Anfang"):
+        table.add_column(col, overflow="fold")
+    for h in hits:
+        table.add_row(str(h.rank), f"{h.score:.3f}", h.chunk.ref, h.snippet)
+    Console().print(table)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cite")
     parser.add_argument("--db", default=str(DB_FILE))
@@ -81,6 +113,19 @@ def main(argv: list[str] | None = None) -> int:
     show = sub.add_parser("show", help="ein Stück anzeigen")
     show.add_argument("chunk_id", type=int)
     show.set_defaults(func=cmd_show)
+
+    index = sub.add_parser("index", help="Vektoren rechnen und speichern")
+    index.add_argument("--config", default="c1200")
+    index.add_argument("--model", default=DEFAULT_MODEL)
+    index.set_defaults(func=cmd_index)
+
+    search = sub.add_parser("search", help="Stücke zu einer Frage finden")
+    search.add_argument("query")
+    search.add_argument("--method", choices=["bm25", "embed", "hybrid"], default="hybrid")
+    search.add_argument("-k", type=int, default=5)
+    search.add_argument("--config", default="c1200")
+    search.add_argument("--model", default=DEFAULT_MODEL)
+    search.set_defaults(func=cmd_search)
 
     args = parser.parse_args(argv)
     return args.func(args)

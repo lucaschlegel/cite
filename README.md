@@ -9,7 +9,7 @@ The example corpus are five public ICH guidelines on clinical trials (ich.org), 
 ## Pipeline
 
 1. **Ingest** (done): download the PDFs, extract text per page, cut it into chunks that respect numbered headings (a heading starts a new chunk once the current one has reached a minimum size; short sections are merged), skip table-of-contents lines, and store documents and chunks in SQLite. Chunk size is a parameter, so several chunkings can live side by side for the evaluation.
-2. **Index and search**: BM25 keyword search as the baseline, dense retrieval with a small local embedding model, and a hybrid of both.
+2. **Index and search** (done): BM25 keyword search as the baseline (no model, no preparation), dense retrieval with a small local embedding model (`BAAI/bge-small-en-v1.5` via fastembed, runs on the CPU, vectors stored in SQLite next to the chunks), and a hybrid that merges both rankings with reciprocal rank fusion.
 3. **Answer**: the model gets the question and the top chunks and answers with explicit references `[document, section, page]`; if the chunks do not contain the answer it says so instead of guessing.
 4. **Evaluate**: a hand-labelled question set (question, gold document and section). Retrieval: recall@k and MRR, compared across BM25 / embeddings / hybrid and across chunk sizes. Answers: does every reference point to a retrieved chunk, and does the answer stay within the retrieved text.
 5. **Serve**: FastAPI with `/search` and `/ask`; Dockerfile.
@@ -23,12 +23,16 @@ pytest                         # fixture PDF only, no network
 python -m cite ingest          # downloads the PDFs into data/ (about 2 MB), writes data/cite.sqlite
 python -m cite stats
 python -m cite show 42         # look at one chunk
+python -m cite index           # embeds all chunks once (~130 MB model download, a few minutes on CPU)
+python -m cite search "How many primary variables should a confirmatory trial have?" --method bm25
+python -m cite search "How many primary variables should a confirmatory trial have?" --method embed
+python -m cite search "How many primary variables should a confirmatory trial have?"   # hybrid
 ```
 
-`python -m cite ingest --max-chars 600` adds a second chunking (`c600`) next to the default `c1200`.
+`python -m cite ingest --max-chars 600` adds a second chunking (`c600`) next to the default `c1200`; `index` and `search` take `--config c600` to use it.
 
 ## Kurzfassung
 
 Fragen über eine Sammlung von PDF-Dokumenten beantworten, jede Antwort mit Beleg auf die Stelle, aus der sie stammt. Eine kleine RAG-Anwendung von Anfang bis Ende: PDFs in abschnittstreue Stücke zerlegen, mit Stichwortsuche und Embeddings suchen, mit einem Sprachmodell antworten, das zitieren muss und „steht nicht in den Dokumenten" sagen darf, und das Ganze gegen einen von Hand gesetzten Fragenkatalog messen. Beispielkorpus sind fünf öffentliche ICH-Richtlinien zu klinischen Studien; der Pipeline ist der Inhalt egal.
 
-Stand: Schritt 1 (Einlesen, Zerlegen, SQLite) fertig, 7 Tests.
+Stand: Schritte 1 und 2 (Einlesen und Zerlegen; Stichwortsuche, Embeddings, Hybrid) fertig, 13 Tests.

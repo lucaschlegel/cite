@@ -31,6 +31,13 @@ CREATE TABLE IF NOT EXISTS chunks (
     text        TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS chunks_doc_config ON chunks(doc, config);
+CREATE TABLE IF NOT EXISTS embeddings (
+    chunk_id  INTEGER NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
+    model     TEXT NOT NULL,
+    dim       INTEGER NOT NULL,
+    vector    BLOB NOT NULL,                -- float32, little-endian
+    PRIMARY KEY (chunk_id, model)
+);
 """
 
 
@@ -70,7 +77,8 @@ def upsert_document(con: sqlite3.Connection, name: str, title: str, url: str | N
 
 
 def replace_chunks(con: sqlite3.Connection, doc: str, config: str, chunks: list[Chunk]) -> int:
-    """Alle Stücke eines Dokuments für eine Chunking-Variante ersetzen."""
+    """Alle Stücke eines Dokuments für eine Chunking-Variante ersetzen (samt ihrer Vektoren)."""
+    con.execute("DELETE FROM embeddings WHERE chunk_id IN (SELECT id FROM chunks WHERE doc = ? AND config = ?)", (doc, config))
     con.execute("DELETE FROM chunks WHERE doc = ? AND config = ?", (doc, config))
     con.executemany(
         "INSERT INTO chunks(doc, config, ordinal, section, page_start, page_end, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -101,3 +109,24 @@ def stats(con: sqlite3.Connection) -> list[dict]:
         "FROM documents d LEFT JOIN chunks c ON c.doc = d.name GROUP BY d.name, c.config ORDER BY d.name, c.config"
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def save_vectors(con: sqlite3.Connection, model: str, items: list[tuple[int, "np.ndarray"]]) -> None:
+    import numpy as np  # noqa: F811  (nur hier gebraucht)
+
+    con.executemany(
+        "INSERT OR REPLACE INTO embeddings(chunk_id, model, dim, vector) VALUES (?, ?, ?, ?)",
+        [(cid, model, int(len(v)), np.asarray(v, dtype=np.float32).tobytes()) for cid, v in items],
+    )
+    con.commit()
+
+
+def load_vectors(con: sqlite3.Connection, config: str, model: str) -> list[tuple[int, "np.ndarray"]]:
+    import numpy as np
+
+    rows = con.execute(
+        "SELECT e.chunk_id, e.vector FROM embeddings e JOIN chunks c ON c.id = e.chunk_id "
+        "WHERE c.config = ? AND e.model = ? ORDER BY c.doc, c.ordinal",
+        (config, model),
+    ).fetchall()
+    return [(r["chunk_id"], np.frombuffer(r["vector"], dtype=np.float32)) for r in rows]

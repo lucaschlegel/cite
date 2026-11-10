@@ -3,3 +3,6 @@ pypdf>=4.0
 pyyaml>=6.0
 rich>=13.0
 pytest>=8.0
+numpy>=1.26
+rank_bm25>=0.2
+fastembed>=0.3

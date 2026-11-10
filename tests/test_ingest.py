@@ -11,6 +11,8 @@ def test_find_heading_accepts_numbered_roman_and_annex():
     assert find_heading("2.2.2 Primary and Secondary Variables") == "2.2.2 Primary and Secondary Variables"
     assert find_heading("II. PRINCIPLES OF ICH GCP") == "II PRINCIPLES OF ICH GCP"
     assert find_heading("ANNEX 1") == "ANNEX 1"
+    assert find_heading("A.3.1 Estimands") == "A.3.1 Estimands"
+    assert find_heading("A.1. PURPOSE AND SCOPE") == "A.1 PURPOSE AND SCOPE"
 
 
 def test_find_heading_rejects_sentences_numbers_and_dates():
@@ -30,11 +32,12 @@ def test_chunk_pages_on_fixture_pdf():
     assert len(pages) == 3
     chunks = chunk_pages("sample", pages, max_chars=500)
     sections = [c.section for c in chunks]
-    assert "2.1 Sample Size" in sections
-    assert "3 REPORTING" in sections
+    # Hauptabschnitte beginnen immer ein neues Stück, der kurze "2. PRINCIPLES" nimmt 2.1 mit auf
+    assert "2 PRINCIPLES" in sections and "3 REPORTING" in sections and "ANNEX 1" in sections
+    assert "2.2 Primary and Secondary Variables" in sections
     assert all(len(c.text) <= 500 * 1.25 + 200 for c in chunks)  # Zeile ist atomar, daher kleiner Puffer
-    sample_size = next(c for c in chunks if c.section == "2.1 Sample Size")
-    assert "thirty widgets" in sample_size.text
+    sample_size = next(c for c in chunks if "thirty widgets" in c.text)
+    assert sample_size.section == "2 PRINCIPLES"
     assert sample_size.page_start == 1
     assert chunks[-1].page_end == 3 and chunks[-1].section == "ANNEX 1"
     assert chunks[0].ref == "[sample, 1 INTRODUCTION, p. 1]"
@@ -42,9 +45,19 @@ def test_chunk_pages_on_fixture_pdf():
 
 def test_short_sections_are_merged_until_min_chars():
     pages = read_pages(FIX / "sample.pdf")
-    big = chunk_pages("sample", pages, max_chars=4000)  # alles passt in wenige Stücke
-    assert len(big) <= 3
-    assert big[0].section == "1 INTRODUCTION"  # trägt die erste Überschrift
+    big = chunk_pages("sample", pages, max_chars=4000)  # Unterabschnitte werden zusammengelegt
+    assert [c.section for c in big] == ["1 INTRODUCTION", "2 PRINCIPLES", "3 REPORTING", "ANNEX 1"]
+    assert "1.1 Scope" in big[0].text and "3.2 Deviations" in big[2].text
+
+
+def test_heading_level():
+    from cite.ingest import heading_level
+
+    assert heading_level("2 INVESTIGATOR") == 1
+    assert heading_level("2.1 Qualifications") == 2
+    assert heading_level("2.1.1 The investigator") == 3
+    assert heading_level("II PRINCIPLES") == 1 and heading_level("ANNEX 1") == 1
+    assert heading_level("A.1 PURPOSE") == 1 and heading_level("A.3.1 Estimands") == 2
 
 
 def test_toc_lines_and_page_numbers_are_skipped():

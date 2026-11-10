@@ -24,10 +24,10 @@ from cite.store import Chunk
 USER_AGENT = "cite/0.1 (document QA experiment; contact via GitHub)"
 DATA_DIR = Path("data")
 
-# Überschriften: "2.2.2 Primary and Secondary Variables", "II. PRINCIPLES OF ICH GCP", "ANNEX 1", "1.1 Scope".
+# Überschriften: "2.2.2 Primary and Secondary Variables", "II. PRINCIPLES OF ICH GCP", "ANNEX 1", "1.1 Scope", "A.3.1 Estimands".
 # Ein Satz, der zufällig mit einer Zahl beginnt ("5 percent of ..."), fällt durch: Titel beginnt groß, endet ohne Satzzeichen.
 HEADING_RE = re.compile(
-    r"^(?:(?P<num>\d{1,2}(?:\.\d{1,2}){0,3})\.?|(?P<roman>[IVX]{1,5})\.|(?P<annex>ANNEX\s+\d+|APPENDIX\s+[A-Z0-9]+))"
+    r"^(?:(?P<num>(?:[A-Z]\.)?\d{1,2}(?:\.\d{1,2}){0,3})\.?|(?P<roman>[IVX]{1,5})\.|(?P<annex>ANNEX\s+\d+|APPENDIX\s+[A-Z0-9]+))"
     r"(?:\s+(?P<title>[A-Z][^\n]{1,90}?[^.,;:\s]))?\s*$"
 )
 # Zeilen, die nur Seitenzahl oder Kopfzeile sind
@@ -92,14 +92,25 @@ def find_heading(line: str) -> str | None:
 SENTENCE_END = re.compile(r"[.!?:;]\s*$")
 
 
+def heading_level(heading: str) -> int:
+    """"2 INVESTIGATOR" -> 1, "2.1 Qualifications" -> 2, "2.1.1 The investigator" -> 3; römisch und Annex -> 1."""
+    label = heading.split(" ", 1)[0]
+    if label[0].isdigit():
+        return label.count(".") + 1
+    if len(label) > 2 and label[1] == "." and label[2].isdigit():  # "A.3.1" -> wie "3.1"
+        return label.count(".")
+    return 1
+
+
 def chunk_pages(doc: str, pages: list[Page], *, max_chars: int = 1200, min_chars: int | None = None,
                 overlap_lines: int = 2) -> list[Chunk]:
     """Zeilen sammeln, bis etwa max_chars erreicht sind. Jeder Chunk kennt Seitenbereich und Überschrift.
 
     PDF-Text hat keine verlässlichen Absätze, deshalb ist die Zeile die kleinste Einheit. Ein Chunk wird
     bevorzugt an einem Satzende geschlossen (ab 80 % der Zielgröße), spätestens bei 125 %.
-    Eine Überschrift beginnt einen neuen Chunk, sobald der aktuelle mindestens min_chars hat (Standard 40 %
-    von max_chars); kürzere Abschnitte werden zusammengelegt, der Chunk trägt dann die erste Überschrift.
+    Eine Hauptüberschrift beginnt immer einen neuen Chunk, eine Unterüberschrift erst, wenn der aktuelle
+    Chunk mindestens min_chars hat (Standard 40 % von max_chars, Ebene 2 die Hälfte davon); kürzere
+    Abschnitte werden zusammengelegt, der Chunk trägt dann die erste Überschrift.
     overlap_lines Zeilen wandern in den nächsten Chunk hinüber, nicht aber über eine Überschrift hinweg."""
     if min_chars is None:
         min_chars = int(max_chars * 0.4)
@@ -128,7 +139,10 @@ def chunk_pages(doc: str, pages: list[Page], *, max_chars: int = 1200, min_chars
                 continue
             heading = find_heading(line)
             if heading:
-                if size() >= min_chars:
+                # Hauptabschnitte ("2. INVESTIGATOR", "II PRINCIPLES", "ANNEX 1") beginnen immer ein neues Stück,
+                # Unterabschnitte erst, wenn das aktuelle Stück groß genug ist (Ebene 2 halb so streng).
+                threshold = {1: 0, 2: min_chars // 2}.get(heading_level(heading), min_chars)
+                if size() >= threshold:
                     flush(carry=False)
                 section = heading
                 if chunk_section is None or not buffer:
