@@ -111,6 +111,11 @@ class EmbeddingIndex:
         rows = [(cid, vec) for cid, vec in load_vectors(con, config, model_name) if cid in by_id]
         if not rows:
             raise RuntimeError(f"no vectors for {config}/{model_name}; run `python -m cite index` first")
+        if len(rows) < len(by_id):
+            import sys
+
+            print(f"[warn] {len(by_id) - len(rows)} of {len(by_id)} chunks have no vector ({config}/{model_name}); "
+                  f"run `python -m cite index --config {config}`", file=sys.stderr)
         chunks = [by_id[cid] for cid, _ in rows]
         return cls(chunks, np.vstack([v for _, v in rows]), embedder)
 

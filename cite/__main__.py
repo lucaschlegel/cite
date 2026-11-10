@@ -6,6 +6,7 @@
   python -m cite index [--config c1200]     Schritt 2: Vektoren für alle Stücke rechnen (einmalig, lokal)
   python -m cite search "frage" [--method]  Schritt 2: bm25 | embed | hybrid
   python -m cite ask "frage" [--method -k]  Schritt 3: Antwort mit geprüften Belegen (braucht ANTHROPIC_API_KEY)
+  python -m cite evaluate [--answers]       Schritt 4: Suche gegen data/questions.csv messen, mit --answers auch die Antworten
 """
 
 from __future__ import annotations
@@ -15,6 +16,8 @@ import sys
 from pathlib import Path
 
 from cite.answer import Answerer, format_record
+from cite.evaluate import (QUESTIONS_FILE, evaluate_answers, evaluate_retrieval, format_answers, format_retrieval,
+                           load_questions, save_report)
 from cite.ingest import ingest_document, load_sources
 from cite.search import DEFAULT_MODEL, Embedder, EmbeddingIndex, Searcher
 from cite.store import DB_FILE, connect, replace_chunks, stats, upsert_document
@@ -108,6 +111,26 @@ def cmd_ask(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_evaluate(args: argparse.Namespace) -> int:
+    con = connect(Path(args.db))
+    questions = load_questions(Path(args.questions))
+    searcher = Searcher(con, args.config, model_name=args.embed_model)
+    log = (lambda m: print(m, file=sys.stderr)) if args.verbose else None
+    reports, results = evaluate_retrieval(searcher, questions, methods=args.methods, k=args.k, log=log)
+    print(format_retrieval(reports))
+    answer_report = None
+    if args.answers:
+        answerer = Answerer(searcher, model=args.model)
+        answer_report = evaluate_answers(answerer, questions, method=args.answer_method, k=args.answer_k, log=log)
+        print()
+        print(format_answers(answer_report))
+    stamp = __import__("datetime").datetime.now().strftime("%Y-%m-%d_%H%M")
+    out = save_report(Path(args.db).parent / f"eval_{args.config}_{stamp}.json",
+                      retrieval=reports, retrieval_results=results, answers=answer_report)
+    print(f"\n[ok] saved {out}", file=sys.stderr)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cite")
     parser.add_argument("--db", default=str(DB_FILE))
@@ -148,6 +171,19 @@ def main(argv: list[str] | None = None) -> int:
     ask.add_argument("--model", default=None, help="Antwortmodell, Standard aus CITE_MODEL oder claude-haiku-5-5")
     ask.add_argument("--embed-model", default=DEFAULT_MODEL)
     ask.set_defaults(func=cmd_ask)
+
+    ev = sub.add_parser("evaluate", help="Suche (und Antworten) gegen den Fragenkatalog messen")
+    ev.add_argument("--questions", default=str(QUESTIONS_FILE))
+    ev.add_argument("--config", default="c1200")
+    ev.add_argument("--methods", nargs="+", default=["bm25", "embed", "hybrid"])
+    ev.add_argument("-k", type=int, default=10, help="Suchtiefe für recall/MRR")
+    ev.add_argument("--answers", action="store_true", help="auch Antworten erzeugen und prüfen (API-Kosten, Cent-Beträge)")
+    ev.add_argument("--answer-method", default="hybrid")
+    ev.add_argument("--answer-k", type=int, default=5)
+    ev.add_argument("--model", default=None)
+    ev.add_argument("--embed-model", default=DEFAULT_MODEL)
+    ev.add_argument("--verbose", "-v", action="store_true")
+    ev.set_defaults(func=cmd_evaluate)
 
     args = parser.parse_args(argv)
     return args.func(args)

@@ -1,0 +1,42 @@
+id,doc,section,question,gold_phrase,answerable
+1,e9,2.2.2,How many primary variables should a confirmatory trial generally have?,There should generally be only one primary variable,yes
+2,e9,2.3,Which two design techniques does ICH E9 name as the most important for avoiding bias?,techniques for avoiding bias in clinical trials are blinding and randomisation,yes
+3,e9,5.2.1,What does the intention-to-treat principle imply for the primary analysis?,the primary analysis should include all randomised subjects,yes
+4,e9,5.2.2,What is the per protocol set?,defines a subset of the subjects in the full analysis set who,yes
+5,e9,3.1.2,In a crossover design what does each subject act as?,acts as his own control for treatment comparisons,yes
+6,e9,3.3.2,Which type of confidence interval should be used for equivalence trials?,For equivalence trials two-sided confidence intervals should be used,yes
+7,e9,3.3.2,Which equivalence margins are needed for an active control equivalence trial compared with a non-inferiority trial?,both the upper and the lower equivalence margins are needed while only the lower margin is needed,yes
+8,e9,3.4,Who may review or conduct the interim analysis in a group sequential design?,An Independent Data Monitoring Committee (see Glossary) may be used to review or to conduct the interim analysis,yes
+9,e9,2.2.2,Is it acceptable to redefine the primary variable after unblinding?,Redefinition of the primary variable after unblinding will almost always be unacceptable,yes
+10,e9,2.2.6 | 7.2.2,How does ICH E9 define a surrogate variable?,When direct assessment of the clinical benefit to the subject through observing actual clinical efficacy is not practical | A variable that provides an indirect measurement of effect in situations where direct measurement of clinical effect is not feasible,yes
+11,e9,2.2.3,When is a composite variable a useful strategy?,If a single primary variable cannot be selected from multiple measurements associated with the primary objective,yes
+12,e9,3.6,How should missing values be treated during data capture?,should be distinguishable from the value zero or characteristic absent,yes
+13,e6r3,2.7.1,How quickly must the investigator report serious adverse events to the sponsor?,All serious adverse events (SAEs) should be reported immediately,yes
+14,e6r3,2.4,What should happen when consent cannot be obtained before trial participation in an emergency situation?,consent should be obtained from the participant or their legally acceptable representative as soon as possible,yes
+15,e6r3,10.1,Who keeps overall responsibility when a sponsor transfers or an investigator delegates trial activities?,but they retain overall responsibility for their respective activities,yes
+16,e6r3,2.10.1,Who is responsible for investigational product accountability at the trial site?,including accountability handling dispensing administration and return rests with the investigator/institution,yes
+17,e6r3,2.11,What must the investigator ensure about breaking the randomisation code in an investigator-blinded trial?,should ensure that the treatment randomisation code is broken only in accordance with,yes
+18,e6r3,2.12,How should corrections to source records be made?,should not obscure the original entry and should be explained if necessary,yes
+19,e6r3,9.5,How long should essential records be retained?,retained securely by sponsors and investigators for the required period in accordance with applicable regulatory requirements,yes
+20,e6r3,3.11.4,Who should perform monitoring according to ICH E6(R3)?,monitoring should be performed by persons not involved in the clinical conduct,yes
+21,e6r3,II,What is quality by design meant to identify?,Quality by design should be implemented to identify the factors (i.e. data and processes) that are critical to ensuring trial quality,yes
+22,e6r3,2.9.2,What should the investigator do when a participant withdraws without giving a reason?,the investigator should make a reasonable effort to ascertain the reason(s) while fully respecting the participant's rights,yes
+23,e3,2,How long should the synopsis of a clinical study report usually be?,A brief synopsis (usually limited to 3 pages) that summarises the study should be provided,yes
+24,e3,10.1,What must the disposition of patients section account for?,There should be a clear accounting of all patients who entered the study,yes
+25,e3,6,Where are investigator signatures placed in the clinical study report when regulatory authorities require them?,these should be included in appendix 16.1.5,yes
+26,e3,12.2.2,How should adverse event terms be presented in the clinical study report?,it is important both to display the original terms used by the investigator and to attempt to group related events,yes
+27,e3,1,What information belongs on the title page of a clinical study report?,The title page should contain the following information,yes
+28,e8r1,2.3,Why should patients be consulted during drug development?,Consulting with patients and/or patient organisations during drug development can help to ensure that patients perspectives are captured,yes
+29,e8r1,3.2,Which factors should be emphasised when identifying critical to quality factors?,Emphasis should be given to those factors that stand out as critical to study quality,yes
+30,e8r1,3.3.3,Whose input should inform clinical study design?,Clinical study design is best informed by input from a broad range of stakeholders including patients and healthcare providers,yes
+31,e8r1,4.3.2,What are exploratory studies designed to investigate?,Exploratory studies are designed to investigate safety and efficacy in a selected population of patients,yes
+32,e9r1,A.3.2,How is an intercurrent event handled under the treatment policy strategy?,The occurrence of the intercurrent event is considered irrelevant in defining the treatment effect of interest,yes
+33,e9r1,A.3.2,What must be made clear when a hypothetical strategy is proposed?,it should be made clear what hypothetical scenario is envisaged,yes
+34,e9r1,A.3.2,What is of interest under the while on treatment strategy?,response to treatment prior to the occurrence of the intercurrent event is of interest,yes
+35,e9r1,A.2,What should a sensitivity analysis target in the estimand framework?,a sensitivity analysis should be conducted in the form of one or more analyses targeting the same estimand,yes
+36,e9r1,A.3.2,Which population does a principal stratum strategy take as the target population?,The target population might be taken to be the,yes
+37,,,What is the maximum fee an ethics committee may charge for reviewing a protocol?,,no
+38,,,How many participants were enrolled in the pivotal trial of remdesivir?,,no
+39,,,Which statistical software does ICH recommend for the primary analysis?,,no
+40,,,What is the required sample size for a phase III oncology trial?,,no
+41,,,On which date did ICH E6(R3) become legally binding in Germany?,,no

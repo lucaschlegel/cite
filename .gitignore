@@ -5,4 +5,5 @@ __pycache__/
 data/*.pdf
 data/*.sqlite
 data/*.json
+!data/questions.csv
 data/models/
