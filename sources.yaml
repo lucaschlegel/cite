@@ -1,0 +1,19 @@
+# Documents to ingest. Public PDFs; the pipeline does not care what they are about.
+# Example corpus: ICH guidelines on clinical trials (ich.org), chosen because they are public,
+# well structured (numbered sections) and long enough to make retrieval non-trivial.
+documents:
+  - name: e6r3
+    title: "ICH E6(R3) Good Clinical Practice"
+    url: "https://database.ich.org/sites/default/files/ICH_E6%28R3%29_Step4_FinalGuideline_2025_0106.pdf"
+  - name: e8r1
+    title: "ICH E8(R1) General Considerations for Clinical Studies"
+    url: "https://database.ich.org/sites/default/files/ICH_E8-R1_Guideline_Step4_2021_1006.pdf"
+  - name: e9
+    title: "ICH E9 Statistical Principles for Clinical Trials"
+    url: "https://database.ich.org/sites/default/files/E9_Guideline.pdf"
+  - name: e9r1
+    title: "ICH E9(R1) Estimands and Sensitivity Analysis"
+    url: "https://database.ich.org/sites/default/files/E9-R1_Step4_Guideline_2019_1203.pdf"
+  - name: e3
+    title: "ICH E3 Structure and Content of Clinical Study Reports"
+    url: "https://database.ich.org/sites/default/files/E3_Guideline.pdf"
