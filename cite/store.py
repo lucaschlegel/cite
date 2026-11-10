@@ -62,7 +62,7 @@ class Chunk:
 
 def connect(path: Path = DB_FILE) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(path)
+    con = sqlite3.connect(path, check_same_thread=False)  # FastAPI bedient Anfragen aus mehreren Threads, wir lesen nur
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
     return con

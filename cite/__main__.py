@@ -7,6 +7,7 @@
   python -m cite search "frage" [--method]  Schritt 2: bm25 | embed | hybrid
   python -m cite ask "frage" [--method -k]  Schritt 3: Antwort mit geprüften Belegen (braucht ANTHROPIC_API_KEY)
   python -m cite evaluate [--answers]       Schritt 4: Suche gegen data/questions.csv messen, mit --answers auch die Antworten
+  python -m cite serve [--port 8000]        Schritt 5: FastAPI, http://127.0.0.1:8000/docs
 """
 
 from __future__ import annotations
@@ -131,6 +132,17 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    import os
+
+    import uvicorn
+
+    os.environ.setdefault("CITE_DB", args.db)
+    os.environ.setdefault("CITE_CONFIG", args.config)
+    uvicorn.run("cite.api:app", host=args.host, port=args.port, reload=False)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cite")
     parser.add_argument("--db", default=str(DB_FILE))
@@ -184,6 +196,12 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--embed-model", default=DEFAULT_MODEL)
     ev.add_argument("--verbose", "-v", action="store_true")
     ev.set_defaults(func=cmd_evaluate)
+
+    serve = sub.add_parser("serve", help="FastAPI starten")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument("--config", default="c1200")
+    serve.set_defaults(func=cmd_serve)
 
     args = parser.parse_args(argv)
     return args.func(args)
