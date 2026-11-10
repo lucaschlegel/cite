@@ -151,8 +151,12 @@ def judge_answer(question: Question, rec: AnswerRecord) -> AnswerResult:
 def evaluate_answers(answerer, questions: list[Question], *, method: str = "hybrid", k: int = 5, log=None) -> AnswerReport:
     results = []
     for q in questions:
-        rec = answerer.ask(q.question, method=method, k=k)
-        res = judge_answer(q, rec)
+        try:
+            rec = answerer.ask(q.question, method=method, k=k)
+            res = judge_answer(q, rec)
+        except Exception as exc:  # eine kaputte Antwort soll die anderen 40 nicht kosten
+            res = AnswerResult(question_id=q.id, answerable_expected=q.answerable, answerable_said=False, grounded=False,
+                               citations=0, citations_ok=0, gold_cited=False, answer=f"ERROR: {exc}")
         results.append(res)
         if log:
             log(f"  q{q.id:<3} expected={'yes' if q.answerable else 'no':3} said={'yes' if res.answerable_said else 'no':3} "

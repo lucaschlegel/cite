@@ -96,3 +96,21 @@ def test_missing_answerable_defaults_to_true():
     payload = {"answer": "Only one.", "citations": [{"passage": 1, "quote": "only one primary variable"}]}
     rec = Answerer(FakeSearcher(), model="test", client=FakeClient(payload)).ask("q")
     assert rec.answer.answerable and rec.grounded
+
+
+def test_citations_given_as_json_string_are_parsed():
+    a = Answer.model_validate({"answer": "x", "citations": '[{"passage": 1, "quote": "only one primary variable"}]'})
+    assert len(a.citations) == 1 and a.citations[0].passage == 1
+
+
+def test_truncated_citation_string_keeps_the_readable_items():
+    broken = '[{"passage": 1, "quote": "only one primary variable"}, {"passage": 4, "quote": "confirmatory trials", "}]'
+    a = Answer.model_validate({"answer": "x", "citations": broken})
+    assert [c.passage for c in a.citations] == [1]
+
+
+def test_stringified_citations_are_parsed():
+    payload = {"answerable": True, "answer": "Only one.",
+               "citations": '[{"passage": 1, "quote": "only one primary variable"}]'}
+    rec = Answerer(FakeSearcher(), model="test", client=FakeClient(payload)).ask("q")
+    assert rec.grounded and rec.checked[0].ok

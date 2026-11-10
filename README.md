@@ -26,7 +26,15 @@ Retrieval, 36 answerable questions, chunking `c1200` (about 1200 characters per 
 
 Keyword search is a strong baseline on this corpus: the questions reuse the guidelines' own vocabulary, and BM25 puts the right passage first in two of three cases. The small embedding model alone is weaker at rank 1 but finds different passages, so fusing the two lists helps at every cutoff. The two remaining misses are instructive: one question names the document ("according to ICH E6(R3)"), which pulls the cover page to the top for every method; the other asks what "quality by design" identifies, and the corpus has a dozen passages about quality by design in two documents, so the specific one lands on rank 7 to 15.
 
-Answer quality and the chunk-size comparison (`c600` vs `c1200`) follow after the next run.
+Smaller chunks (`c600`, about 600 characters, 1180 chunks) are not better here:
+
+| method | R@1 | R@3 | R@5 | MRR |
+| --- | --- | --- | --- | --- |
+| BM25 | 61 % | 78 % | 86 % | 0.731 |
+| embeddings (bge-small) | 47 % | 72 % | 86 % | 0.619 |
+| hybrid (RRF) | 64 % | 86 % | 94 % | 0.752 |
+
+Recall at 5 is identical, but the right passage lands on rank 1 less often: with half-size chunks a section splits into two or three pieces that all look similar, and they share the score. For this corpus, section-aware chunks of about 1200 characters are the better unit. Answer quality (grounded rate, citation precision, refusals) follows after the next run.
 
 ## Quickstart
 

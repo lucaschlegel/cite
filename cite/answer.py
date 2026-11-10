@@ -12,11 +12,12 @@ in der Praxis zählt: nicht die Antwort, sondern ob man ihr trauen kann.
 from __future__ import annotations
 
 import difflib
+import json
 import os
 import re
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from cite.search import Hit
 
@@ -35,6 +36,25 @@ class Answer(BaseModel):
     answerable: bool = Field(default=True, description="false if the passages do not contain the information needed")
     answer: str = Field(description="The answer in two to five plain sentences; if not answerable, say what is missing")
     citations: list[Citation] = Field(default_factory=list, description="One citation per claim; empty if not answerable")
+
+    @field_validator("citations", mode="before")
+    @classmethod
+    def _coerce_citations(cls, value):
+        """Haiku liefert die Liste gelegentlich als JSON-Text statt als Liste, manchmal sogar abgeschnitten.
+        Dann den Text parsen, zur Not die einzelnen Objekte herausziehen; was nicht lesbar ist, fällt weg
+        und fehlt dann sichtbar bei den Belegen."""
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                items = []
+                for raw in re.findall(r"\{[^{}]*\}", value):
+                    try:
+                        items.append(json.loads(raw))
+                    except json.JSONDecodeError:
+                        continue
+                return items
+        return value
 
 
 SYSTEM_PROMPT = """You answer questions strictly from the numbered passages you are given.

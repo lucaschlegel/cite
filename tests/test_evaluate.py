@@ -92,3 +92,15 @@ def test_save_report_writes_json(tmp_path):
     out = save_report(tmp_path / "r.json", retrieval=reports, retrieval_results=results, answers=None)
     text = out.read_text(encoding="utf-8")
     assert '"method": "bm25"' in text and '"timestamp"' in text and "answers" not in text
+
+
+def test_evaluate_answers_survives_a_failing_question():
+    class Boom(FakeAnswerer):
+        def ask(self, question, method="hybrid", k=5):
+            if "fee" in question:
+                raise RuntimeError("api down")
+            return super().ask(question, method, k)
+
+    rep = evaluate_answers(Boom(FakeSearcher()), [Q_YES, Q_NO])
+    assert rep.grounded_rate == 1.0
+    assert rep.results[1].answer.startswith("ERROR") and rep.refusal_rate == 1.0
