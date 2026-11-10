@@ -5,6 +5,7 @@
   python -m cite show <chunk-id>            Ein Stück ansehen
   python -m cite index [--config c1200]     Schritt 2: Vektoren für alle Stücke rechnen (einmalig, lokal)
   python -m cite search "frage" [--method]  Schritt 2: bm25 | embed | hybrid
+  python -m cite ask "frage" [--method -k]  Schritt 3: Antwort mit geprüften Belegen (braucht ANTHROPIC_API_KEY)
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from cite.answer import Answerer, format_record
 from cite.ingest import ingest_document, load_sources
 from cite.search import DEFAULT_MODEL, Embedder, EmbeddingIndex, Searcher
 from cite.store import DB_FILE, connect, replace_chunks, stats, upsert_document
@@ -86,12 +88,23 @@ def cmd_search(args: argparse.Namespace) -> int:
         for h in hits:
             print(f"{h.rank:2} {h.score:7.3f} {h.chunk.ref} {h.snippet}")
         return 0
-    table = Table(title=f"{args.method}: {args.query}")
+    from rich.markup import escape
+
+    table = Table(title=escape(f"{args.method}: {args.query}"))
     for col in ("#", "Score", "Beleg", "Anfang"):
         table.add_column(col, overflow="fold")
     for h in hits:
-        table.add_row(str(h.rank), f"{h.score:.3f}", h.chunk.ref, h.snippet)
+        table.add_row(str(h.rank), f"{h.score:.3f}", escape(h.chunk.ref), escape(h.snippet))
     Console().print(table)
+    return 0
+
+
+def cmd_ask(args: argparse.Namespace) -> int:
+    con = connect(Path(args.db))
+    searcher = Searcher(con, args.config, model_name=args.embed_model)
+    answerer = Answerer(searcher, model=args.model)
+    rec = answerer.ask(args.question, method=args.method, k=args.k)
+    print(format_record(rec))
     return 0
 
 
@@ -126,6 +139,15 @@ def main(argv: list[str] | None = None) -> int:
     search.add_argument("--config", default="c1200")
     search.add_argument("--model", default=DEFAULT_MODEL)
     search.set_defaults(func=cmd_search)
+
+    ask = sub.add_parser("ask", help="Frage beantworten, Belege prüfen")
+    ask.add_argument("question")
+    ask.add_argument("--method", choices=["bm25", "embed", "hybrid"], default="hybrid")
+    ask.add_argument("-k", type=int, default=5)
+    ask.add_argument("--config", default="c1200")
+    ask.add_argument("--model", default=None, help="Antwortmodell, Standard aus CITE_MODEL oder claude-haiku-5-5")
+    ask.add_argument("--embed-model", default=DEFAULT_MODEL)
+    ask.set_defaults(func=cmd_ask)
 
     args = parser.parse_args(argv)
     return args.func(args)
